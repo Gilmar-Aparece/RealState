@@ -1,0 +1,1375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FileHub — GitHub File Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0f12;
+    --surface: #151820;
+    --surface2: #1c2130;
+    --surface3: #232a3d;
+    --border: #2a3350;
+    --border2: #3a4a72;
+    --accent: #4f8ef7;
+    --accent2: #6fa3ff;
+    --green: #3dd68c;
+    --green2: #5ef5a8;
+    --red: #f75f5f;
+    --yellow: #f7c948;
+    --purple: #b57bee;
+    --text: #e8edf8;
+    --text2: #8a9bc4;
+    --text3: #5c6d96;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Syne', sans-serif;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--sans); background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
+
+  /* TOP NAV */
+  .topbar { display: flex; align-items: center; padding: 0 24px; height: 56px; background: var(--surface); border-bottom: 1px solid var(--border); gap: 16px; position: sticky; top: 0; z-index: 100; }
+  .logo { font-size: 18px; font-weight: 800; letter-spacing: -0.5px; display: flex; align-items: center; gap: 8px; }
+  .logo-icon { width: 28px; height: 28px; background: var(--accent); border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+  .logo-icon svg { width: 16px; height: 16px; fill: white; }
+  .topbar-spacer { flex: 1; }
+  .github-status { display: flex; align-items: center; gap: 8px; font-size: 12px; font-family: var(--mono); color: var(--text3); background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 4px 12px; cursor: pointer; transition: all 0.2s; }
+  .github-status:hover { border-color: var(--border2); color: var(--text2); }
+  .github-status .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text3); }
+  .github-status.connected .dot { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .github-status.connected { color: var(--green); border-color: #1f4a36; }
+
+  /* MAIN LAYOUT */
+  .main { display: flex; flex: 1; height: calc(100vh - 56px); overflow: hidden; }
+
+  /* SIDEBAR */
+  .sidebar { width: 280px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+  .sidebar-header { padding: 16px 16px 12px; border-bottom: 1px solid var(--border); }
+  .sidebar-title { font-size: 11px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text3); margin-bottom: 12px; }
+  .repo-info { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; }
+  .repo-name { font-family: var(--mono); font-size: 13px; font-weight: 500; color: var(--accent2); margin-bottom: 4px; word-break: break-all; }
+  .repo-branch { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text3); font-family: var(--mono); }
+  .branch-icon { color: var(--purple); }
+  .file-tree { flex: 1; overflow-y: auto; padding: 8px 0; }
+  .file-tree::-webkit-scrollbar { width: 4px; }
+  .file-tree::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+  .tree-folder { padding: 4px 16px; font-size: 11px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--text3); font-family: var(--mono); display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+  .tree-item { display: flex; align-items: center; gap: 8px; padding: 6px 16px; cursor: pointer; font-size: 13px; font-family: var(--mono); transition: background 0.15s; position: relative; user-select: none; }
+  .tree-item:hover { background: var(--surface2); }
+  .tree-item.active { background: rgba(79, 142, 247, 0.12); color: var(--accent2); }
+  .tree-item.active::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: var(--accent); }
+  .tree-item.indented { padding-left: 32px; }
+  .tree-icon { font-size: 14px; flex-shrink: 0; }
+  .tree-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tree-badge { font-size: 10px; padding: 1px 5px; border-radius: 3px; font-weight: 600; flex-shrink: 0; }
+  .tree-badge.new { background: rgba(61, 214, 140, 0.15); color: var(--green); }
+  .tree-badge.mod { background: rgba(247, 201, 72, 0.15); color: var(--yellow); }
+  .tree-item .del-btn { display: none; padding: 2px 4px; border-radius: 3px; color: var(--red); font-size: 11px; background: rgba(247, 95, 95, 0.12); border: none; cursor: pointer; font-family: var(--mono); flex-shrink: 0; }
+  .tree-item:hover .del-btn { display: block; }
+  .sidebar-actions { padding: 12px 16px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+
+  /* CONTENT AREA */
+  .content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .content-header { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--border); background: var(--surface); }
+  .breadcrumb { display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 12px; color: var(--text3); flex: 1; }
+  .breadcrumb span { color: var(--text2); }
+  .breadcrumb span:last-child { color: var(--text); font-weight: 500; }
+  .header-actions { display: flex; gap: 8px; }
+
+  /* FILE DROP ZONE */
+  .drop-zone { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .drop-overlay { display: none; position: absolute; inset: 0; background: rgba(79, 142, 247, 0.08); border: 2px dashed var(--accent); border-radius: var(--radius); z-index: 10; align-items: center; justify-content: center; flex-direction: column; gap: 12px; font-size: 16px; font-weight: 600; color: var(--accent2); }
+  .drop-overlay.active { display: flex; }
+  .file-area { position: relative; flex: 1; overflow-y: auto; padding: 20px; }
+  .file-area::-webkit-scrollbar { width: 4px; }
+  .file-area::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  /* EMPTY STATE */
+  .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 16px; color: var(--text3); text-align: center; }
+  .empty-icon { width: 80px; height: 80px; background: var(--surface2); border: 2px dashed var(--border2); border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 36px; }
+  .empty-title { font-size: 15px; font-weight: 600; color: var(--text2); }
+  .empty-sub { font-size: 13px; max-width: 280px; line-height: 1.6; }
+  .empty-hint { font-size: 11px; color: var(--text3); font-family: var(--mono); background: var(--surface2); padding: 6px 14px; border-radius: 20px; border: 1px solid var(--border); }
+
+  /* FILE GRID */
+  .file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+  .file-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; cursor: pointer; transition: all 0.2s; position: relative; overflow: hidden; }
+  .file-card:hover { border-color: var(--border2); background: var(--surface2); transform: translateY(-1px); }
+  .file-card.has-preview:hover { border-color: var(--accent); }
+  .file-card-icon { font-size: 32px; margin-bottom: 10px; display: block; }
+  .file-card-name { font-family: var(--mono); font-size: 11px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+  .file-card-meta { font-size: 10px; color: var(--text3); margin-top: 4px; font-family: var(--mono); }
+  .file-card-path { font-size: 9px; color: var(--text3); margin-top: 2px; font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.7; }
+  .file-card-status { position: absolute; top: 8px; right: 8px; font-size: 10px; padding: 2px 6px; border-radius: 3px; font-weight: 700; letter-spacing: 0.5px; }
+  .status-new { background: rgba(61, 214, 140, 0.15); color: var(--green); }
+  .status-mod { background: rgba(247, 201, 72, 0.15); color: var(--yellow); }
+  .status-pushed { background: rgba(79, 142, 247, 0.12); color: var(--accent2); }
+  .file-card-actions { position: absolute; top: 6px; right: 6px; display: none; gap: 4px; }
+  .file-card:hover .file-card-actions { display: flex; }
+  .file-card:hover .file-card-status { display: none; }
+  .fc-btn { width: 22px; height: 22px; border-radius: 4px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 11px; transition: all 0.15s; }
+  .fc-btn-preview { background: rgba(79,142,247,0.2); color: var(--accent2); }
+  .fc-btn-preview:hover { background: rgba(79,142,247,0.4); }
+  .fc-btn-remove { background: rgba(247, 95, 95, 0.15); color: var(--red); }
+  .fc-btn-remove:hover { background: rgba(247, 95, 95, 0.3); }
+
+  /* BUTTONS */
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: var(--radius-sm); font-family: var(--sans); font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; white-space: nowrap; }
+  .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn-primary:hover { background: var(--accent2); border-color: var(--accent2); }
+  .btn-primary:active { transform: scale(0.98); }
+  .btn-ghost { background: var(--surface2); color: var(--text2); border-color: var(--border); }
+  .btn-ghost:hover { border-color: var(--border2); color: var(--text); }
+  .btn-danger { background: rgba(247, 95, 95, 0.12); color: var(--red); border-color: rgba(247, 95, 95, 0.3); }
+  .btn-danger:hover { background: rgba(247, 95, 95, 0.2); }
+  .btn-green { background: var(--green); color: #0a2018; border-color: var(--green); }
+  .btn-green:hover { background: var(--green2); }
+  .btn-green:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-terminal { background: #0a0d10; color: var(--green); border-color: #1c2535; font-family: var(--mono); }
+  .btn-terminal:hover { border-color: var(--green); color: var(--green2); }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  .btn-full { width: 100%; justify-content: center; }
+
+  /* PUSH PANEL */
+  .push-panel { background: var(--surface); border-top: 1px solid var(--border); padding: 16px 20px; display: none; gap: 12px; align-items: flex-start; }
+  .push-panel.visible { display: flex; }
+  .push-form { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+  .push-row { display: flex; gap: 8px; align-items: center; }
+  .push-label { font-size: 11px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: var(--text3); width: 80px; flex-shrink: 0; }
+  input[type="text"], input[type="password"], textarea { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-family: var(--mono); font-size: 12px; padding: 7px 10px; outline: none; transition: border-color 0.2s; width: 100%; }
+  input:focus, textarea:focus { border-color: var(--accent); }
+  input::placeholder, textarea::placeholder { color: var(--text3); }
+  textarea { resize: vertical; min-height: 60px; font-size: 12px; }
+
+  /* STATS BAR */
+  .stats-bar { display: flex; gap: 20px; padding: 8px 20px; background: var(--surface2); border-bottom: 1px solid var(--border); font-size: 11px; font-family: var(--mono); color: var(--text3); align-items: center; }
+  .stat { display: flex; gap: 5px; align-items: center; }
+  .stat-val { color: var(--text2); font-weight: 600; }
+  .stat-dot { width: 5px; height: 5px; border-radius: 50%; }
+  .dot-green { background: var(--green); }
+  .dot-yellow { background: var(--yellow); }
+  .dot-blue { background: var(--accent); }
+  .stats-spacer { flex: 1; }
+
+  /* PROGRESS */
+  .progress-bar { height: 3px; background: var(--surface3); border-radius: 2px; overflow: hidden; margin-top: 8px; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--green)); border-radius: 2px; transition: width 0.3s; width: 0%; }
+
+  /* ═══════════════ INTERACTIVE TERMINAL ═══════════════ */
+  .terminal-section { border-top: 1px solid var(--border); background: var(--surface); flex-shrink: 0; }
+  .terminal-header-bar { display: flex; align-items: center; gap: 10px; padding: 8px 20px; cursor: pointer; user-select: none; transition: background 0.15s; }
+  .terminal-header-bar:hover { background: var(--surface2); }
+  .terminal-dots { display: flex; gap: 5px; align-items: center; }
+  .tdot { width: 10px; height: 10px; border-radius: 50%; }
+  .td-red { background: #ff5f57; }
+  .td-yellow { background: #ffbd2e; }
+  .td-green { background: #28c840; }
+  .terminal-title-text { font-family: var(--mono); font-size: 11px; color: var(--text3); flex: 1; }
+  .terminal-chevron { font-size: 10px; color: var(--text3); transition: transform 0.2s; }
+  .terminal-chevron.open { transform: rotate(180deg); }
+  .terminal-tab-bar { display: flex; background: #0a0d10; border-bottom: 1px solid #1c2535; overflow: hidden; }
+  .terminal-tab { padding: 6px 16px; font-family: var(--mono); font-size: 11px; color: #3a4a62; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; white-space: nowrap; }
+  .terminal-tab:hover { color: var(--text2); }
+  .terminal-tab.active { color: var(--green); border-bottom-color: var(--green); background: rgba(61,214,140,0.04); }
+  .terminal-body { display: none; max-height: 340px; overflow: hidden; flex-direction: column; }
+  .terminal-body.open { display: flex; }
+
+  /* INTERACTIVE TERMINAL TAB */
+  .interactive-term { background: #080a0f; flex: 1; display: flex; flex-direction: column; max-height: 340px; }
+  .iterm-output { flex: 1; overflow-y: auto; padding: 12px 16px; font-family: var(--mono); font-size: 12px; line-height: 1.7; min-height: 180px; max-height: 240px; }
+  .iterm-output::-webkit-scrollbar { width: 3px; }
+  .iterm-output::-webkit-scrollbar-thumb { background: var(--border2); }
+  .iterm-line { display: flex; gap: 8px; }
+  .iterm-prompt { color: var(--green); flex-shrink: 0; }
+  .iterm-user { color: #3dd68c; }
+  .iterm-at { color: #4a5570; }
+  .iterm-host { color: #6fa3ff; }
+  .iterm-path { color: #6fa3ff; }
+  .iterm-branch { color: var(--purple); }
+  .iterm-cmd { color: #c8d8f8; flex: 1; word-break: break-all; }
+  .iterm-out { padding: 0 0 0 0; color: #4a5a7a; font-style: italic; }
+  .iterm-out.ok { color: var(--green); font-style: normal; }
+  .iterm-out.err { color: var(--red); font-style: normal; }
+  .iterm-out.dim { color: #3a4a62; font-style: normal; }
+  .iterm-input-row { display: flex; align-items: center; padding: 8px 16px; border-top: 1px solid #1c2535; background: #0a0c12; gap: 8px; flex-shrink: 0; }
+  .iterm-ps1 { font-family: var(--mono); font-size: 12px; white-space: nowrap; flex-shrink: 0; }
+  .iterm-ps1 .ps1-user { color: var(--green); }
+  .iterm-ps1 .ps1-path { color: var(--accent2); }
+  .iterm-ps1 .ps1-branch { color: var(--purple); }
+  .iterm-input { flex: 1; background: transparent; border: none; outline: none; font-family: var(--mono); font-size: 12px; color: var(--text); caret-color: var(--green); }
+  .iterm-run-btn { background: rgba(61,214,140,0.12); border: 1px solid rgba(61,214,140,0.25); color: var(--green); font-family: var(--mono); font-size: 11px; padding: 4px 10px; border-radius: 4px; cursor: pointer; flex-shrink: 0; transition: all 0.15s; }
+  .iterm-run-btn:hover { background: rgba(61,214,140,0.2); }
+
+  /* COMMANDS REFERENCE TAB */
+  .cmd-scroll { overflow-y: auto; max-height: 280px; padding: 12px 16px 16px; background: #080a0f; }
+  .cmd-scroll::-webkit-scrollbar { width: 3px; }
+  .cmd-scroll::-webkit-scrollbar-thumb { background: var(--border2); }
+  .cmd-tab-bar2 { display: flex; gap: 0; border-bottom: 1px solid #1c2535; margin-bottom: 12px; }
+  .cmd-tab2 { padding: 5px 12px; font-size: 11px; font-weight: 600; letter-spacing: 0.5px; color: #4a5570; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; user-select: none; font-family: var(--mono); }
+  .cmd-tab2:hover { color: var(--text2); }
+  .cmd-tab2.active { color: var(--accent2); border-bottom-color: var(--accent); }
+  .cmd-ref-content { display: none; }
+  .cmd-ref-content.active { display: block; }
+  .cmd-section-label { display: flex; align-items: center; gap: 8px; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #2a3a5a; margin: 12px 0 8px; font-family: var(--mono); }
+  .cmd-section-label::after { content: ''; flex: 1; height: 1px; background: #1c2535; }
+  .cmd-block { margin-bottom: 8px; }
+  .cmd-comment { color: #3a4a62; font-size: 11px; display: block; margin-bottom: 2px; font-family: var(--mono); font-style: italic; }
+  .cmd-line-ref { display: flex; align-items: center; background: #111520; border: 1px solid #1c2535; border-radius: 4px; overflow: hidden; }
+  .cmd-line-ref:hover { border-color: #2a3a5a; }
+  .cmd-prompt-ref { padding: 6px 8px; color: var(--green); flex-shrink: 0; border-right: 1px solid #1c2535; background: #0d1118; font-family: var(--mono); font-size: 11.5px; }
+  .cmd-text-ref { flex: 1; padding: 6px 10px; color: #c8d8f8; font-family: var(--mono); font-size: 11.5px; word-break: break-all; }
+  .cmd-kw { color: #6fa3ff; }
+  .cmd-fl { color: #b57bee; }
+  .cmd-str { color: #f7c948; }
+  .cmd-ph { color: #f75f5f; font-style: italic; }
+  .cmd-pa { color: #3dd68c; }
+  .cmd-copy-ref { padding: 6px 8px; color: #3a4a72; cursor: pointer; background: transparent; border: none; font-family: var(--mono); font-size: 12px; transition: color 0.15s; flex-shrink: 0; }
+  .cmd-copy-ref:hover { color: var(--accent2); }
+  .cmd-run-ref { padding: 4px 8px; margin: 2px; color: var(--green); cursor: pointer; background: rgba(61,214,140,0.08); border: 1px solid rgba(61,214,140,0.2); font-family: var(--mono); font-size: 10px; border-radius: 3px; transition: all 0.15s; flex-shrink: 0; }
+  .cmd-run-ref:hover { background: rgba(61,214,140,0.18); }
+  .ref-copy-all { font-family: var(--mono); font-size: 10px; color: var(--text3); cursor: pointer; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 3px 8px; transition: all 0.15s; }
+  .ref-copy-all:hover { color: var(--accent2); border-color: var(--accent); }
+  .cmd-note { display: flex; align-items: flex-start; gap: 8px; font-size: 11px; color: #4a5a7a; background: rgba(79,142,247,0.06); border: 1px solid rgba(79,142,247,0.12); border-radius: 5px; padding: 8px 12px; margin-top: 8px; line-height: 1.6; font-family: var(--mono); }
+
+  /* MODAL */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 200; display: none; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border2); border-radius: 14px; padding: 28px; width: 480px; max-width: 95vw; }
+  .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+  .modal-sub { font-size: 13px; color: var(--text3); margin-bottom: 24px; line-height: 1.6; }
+  .modal-field { margin-bottom: 14px; }
+  .modal-field label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); margin-bottom: 6px; }
+  .modal-actions { display: flex; gap: 8px; margin-top: 20px; justify-content: flex-end; }
+
+  /* FILE PREVIEW MODAL */
+  .preview-modal { background: var(--surface); border: 1px solid var(--border2); border-radius: 14px; width: 92vw; max-width: 1100px; height: 88vh; max-height: 900px; display: flex; flex-direction: column; overflow: hidden; }
+  .preview-header { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .preview-title { font-family: var(--mono); font-size: 14px; font-weight: 600; flex: 1; }
+  .preview-badge { font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 700; }
+  .preview-body { flex: 1; overflow: hidden; position: relative; }
+  .preview-iframe { width: 100%; height: 100%; border: none; background: white; }
+  .preview-image { width: 100%; height: 100%; object-fit: contain; padding: 20px; }
+  .preview-code { width: 100%; height: 100%; overflow: auto; padding: 20px; background: #080a0f; font-family: var(--mono); font-size: 12px; line-height: 1.7; color: var(--text2); white-space: pre-wrap; word-break: break-all; }
+  .preview-unsupported { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 16px; color: var(--text3); }
+
+  /* TOAST */
+  .toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 500; display: flex; flex-direction: column; gap: 8px; }
+  .toast { background: var(--surface2); border: 1px solid var(--border2); border-radius: var(--radius); padding: 12px 16px; font-size: 13px; display: flex; align-items: center; gap: 10px; animation: slideIn 0.3s ease; max-width: 340px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+  .toast.success { border-color: #1f4a36; }
+  .toast.error { border-color: rgba(247,95,95,0.4); }
+  .toast-icon { font-size: 16px; flex-shrink: 0; }
+  .toast-msg { flex: 1; line-height: 1.4; }
+  @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+  #file-input { display: none; }
+  #folder-input { display: none; }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </div>
+    FileHub
+  </div>
+  <div class="topbar-spacer"></div>
+  <div class="github-status" id="gh-status-btn" onclick="openConfigModal()">
+    <span class="dot"></span>
+    <span id="gh-status-text">Connect GitHub</span>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-title">Repository</div>
+      <div class="repo-info" id="repo-info">
+        <div class="repo-name" id="repo-display">not connected</div>
+        <div class="repo-branch">
+          <span class="branch-icon">⎇</span>
+          <span id="branch-display">—</span>
+        </div>
+      </div>
+    </div>
+    <div class="file-tree" id="file-tree">
+      <div style="padding: 20px 16px; color: var(--text3); font-size: 12px; font-family: var(--mono);">No files uploaded yet</div>
+    </div>
+    <div class="sidebar-actions">
+      <button class="btn btn-ghost btn-full btn-sm" onclick="document.getElementById('file-input').click()">📄 Add Files</button>
+      <button class="btn btn-ghost btn-full btn-sm" onclick="document.getElementById('folder-input').click()">📁 Add Folder</button>
+      <button class="btn btn-danger btn-full btn-sm" id="clear-btn" onclick="clearAll()" style="display:none">🗑 Clear All</button>
+    </div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content">
+    <div class="content-header">
+      <div class="breadcrumb">
+        <span id="repo-breadcrumb">—</span>
+        <span>/</span>
+        <span id="path-breadcrumb">root</span>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('file-input').click()">↑ Files</button>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('folder-input').click()">📁 Folder</button>
+        <button class="btn btn-primary btn-sm" id="push-toggle-btn" onclick="togglePushPanel()" style="display:none">⬆ Push to GitHub</button>
+      </div>
+    </div>
+
+    <div class="stats-bar" id="stats-bar" style="display:none">
+      <div class="stat"><span class="stat-dot dot-green"></span><span class="stat-val" id="stat-new">0</span> new</div>
+      <div class="stat"><span class="stat-dot dot-yellow"></span><span class="stat-val" id="stat-mod">0</span> modified</div>
+      <div class="stat"><span class="stat-dot dot-blue"></span><span class="stat-val" id="stat-total">0</span> total</div>
+      <div class="stats-spacer"></div>
+      <div style="font-size:10px; color:var(--text3)">click file card to preview</div>
+    </div>
+
+    <div class="drop-zone" id="drop-zone">
+      <div class="file-area" id="file-area">
+        <div class="drop-overlay" id="drop-overlay">
+          <span style="font-size:48px">📂</span>
+          <div style="font-size:16px; font-weight:700">Drop files or folders here</div>
+          <div style="font-size:12px; color:var(--text3); font-family:var(--mono)">All files inside folders will be added with paths preserved</div>
+        </div>
+        <div class="empty-state" id="empty-state">
+          <div class="empty-icon">📂</div>
+          <div class="empty-title">No files yet</div>
+          <div class="empty-sub">Drag & drop files or entire folders here. Paths are preserved for nested structures.</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
+            <button class="btn btn-primary btn-sm" onclick="document.getElementById('file-input').click()">📄 Choose Files</button>
+            <button class="btn btn-ghost btn-sm" onclick="document.getElementById('folder-input').click()">📁 Choose Folder</button>
+          </div>
+          <div class="empty-hint">💡 Tip: drop your whole project folder in one go</div>
+        </div>
+        <div class="file-grid" id="file-grid" style="display:none"></div>
+      </div>
+    </div>
+
+    <!-- PUSH PANEL -->
+    <div class="push-panel" id="push-panel">
+      <div class="push-form">
+        <div class="push-row">
+          <span class="push-label">Message</span>
+          <textarea id="commit-msg" placeholder="feat: add new files via FileHub" style="min-height:44px; flex:1"></textarea>
+        </div>
+        <div class="push-row">
+          <span class="push-label">Branch</span>
+          <input type="text" id="push-branch" placeholder="main" style="flex:1; max-width:160px">
+          <span style="font-size:11px; color:var(--text3); margin-left:4px; white-space:nowrap">Path prefix:</span>
+          <input type="text" id="push-path" placeholder="/" style="flex:1; max-width:130px">
+        </div>
+        <div class="push-row">
+          <span class="push-label"></span>
+          <div id="push-progress" style="flex:1; display:none">
+            <div style="font-size:11px; color:var(--text3); font-family:var(--mono)" id="push-status-text">Pushing...</div>
+            <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+          </div>
+          <div style="display:flex; gap:8px; margin-left:auto" id="push-actions">
+            <button class="btn btn-ghost btn-sm" onclick="togglePushPanel()">Cancel</button>
+            <button class="btn btn-green btn-sm" id="do-push-btn" onclick="pushToGitHub()">⬆ Push Files</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ INTERACTIVE TERMINAL ═══ -->
+    <div class="terminal-section">
+      <div class="terminal-header-bar" id="term-header" onclick="toggleTerminal()">
+        <div class="terminal-dots">
+          <div class="tdot td-red"></div>
+          <div class="tdot td-yellow"></div>
+          <div class="tdot td-green"></div>
+        </div>
+        <span class="terminal-title-text" id="term-title-text">$ Terminal — <span style="color:var(--text3)" id="term-hint">connect GitHub to push</span></span>
+        <span class="terminal-chevron" id="term-chevron">▼</span>
+      </div>
+      <div class="terminal-body" id="terminal-body">
+        <div class="terminal-tab-bar">
+          <div class="terminal-tab active" id="ttab-interactive" onclick="switchTermTab('interactive')">▶ Interactive</div>
+          <div class="terminal-tab" id="ttab-reference" onclick="switchTermTab('reference')">📋 Commands</div>
+        </div>
+
+        <!-- INTERACTIVE TERMINAL -->
+        <div class="interactive-term" id="term-interactive">
+          <div class="iterm-output" id="iterm-output"></div>
+          <div class="iterm-input-row">
+            <div class="iterm-ps1">
+              <span class="ps1-user" id="ps1-user">user</span><span style="color:#4a5570">@FileHub</span> <span class="ps1-path" id="ps1-path">~/repo</span> <span class="ps1-branch" id="ps1-branch">(main)</span> <span style="color:#c8d8f8">$</span>
+            </div>
+            <input class="iterm-input" id="iterm-input" placeholder="type a git command…" autocomplete="off" spellcheck="false">
+            <button class="iterm-run-btn" onclick="runTermCmd()">Run ↵</button>
+          </div>
+        </div>
+
+        <!-- COMMANDS REFERENCE -->
+        <div id="term-reference" style="display:none">
+          <div class="cmd-scroll">
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px">
+              <div class="cmd-tab-bar2">
+                <div class="cmd-tab2 active" onclick="switchRefTab('first')">First Push</div>
+                <div class="cmd-tab2" onclick="switchRefTab('update')">Update</div>
+                <div class="cmd-tab2" onclick="switchRefTab('branch')">Branch</div>
+              </div>
+              <button class="ref-copy-all" onclick="copyRefAll()">⧉ Copy All</button>
+            </div>
+
+            <!-- First Push -->
+            <div class="cmd-ref-content active" id="ref-first">
+              <div class="cmd-section-label">1 — Init &amp; link</div>
+              <div class="cmd-block">
+                <span class="cmd-comment"># Go to your project folder</span>
+                <div class="cmd-line-ref">
+                  <span class="cmd-prompt-ref">$</span>
+                  <span class="cmd-text-ref"><span class="cmd-kw">cd</span> <span class="cmd-pa" id="r-cd">~/Desktop/newRepo</span></span>
+                  <button class="cmd-run-ref" onclick="sendToTerminal(this)">▶ Run</button>
+                  <button class="cmd-copy-ref" onclick="copyCmdRef(this)">⧉</button>
+                </div>
+              </div>
+              <div class="cmd-block">
+                <span class="cmd-comment"># Initialize git</span>
+                <div class="cmd-line-ref">
+                  <span class="cmd-prompt-ref">$</span>
+                  <span class="cmd-text-ref"><span class="cmd-kw">git</span> init</span>
+                  <button class="cmd-run-ref" onclick="sendToTerminal(this)">▶ Run</button>
+                  <button class="cmd-copy-ref" onclick="copyCmdRef(this)">⧉</button>
+                </div>
+              </div>
+              <div class="cmd-block">
+                <span class="cmd-comment"># Add remote origin</span>
+                <div class="cmd-line-ref">
+                  <span class="cmd-prompt-ref">$</span>
+                  <span class="cmd-text-ref"><span class="cmd-kw">git</span> remote add origin <span class="cmd-str" id="r-remote">https://github.com/username/repo.git</span></span>
+                  <button class="cmd-run-ref" onclick="sendToTerminal(this)">▶ Run</button>
+                  <button class="cmd-copy-ref" onclick="copyCmdRef(this)">⧉</button>
+                </div>
+              </div>
+              <div class="cmd-section-label">2 — Commit &amp; push</div>
+              <div class="cmd-block">
+                <div class="cmd-line-ref">
+                  <span class="cmd-prompt-ref">$</span>
+                  <span class="cmd-text-ref"><span class="cmd-kw">git</span> add <span class="cmd-fl">.</span></span>
+                  <button class="cmd-run-ref" onclick="sendToTerminal(this)">▶ Run</button>
+                  <button class="cmd-copy-ref" onclick="copyCmdRef(this)">⧉</button>
+                </div>
+              </div>
+              <div class="cmd-block">
+                <div class="cmd-line-ref">
+                  <span class="cmd-prompt-ref">$</span>
+                  <span class="cmd-text-ref"><span class="cmd-kw">git</span> commit <span class="cmd-fl">-m</span> <span class="cmd-str" id="r-msg1">"initial commit"</span></span>
+                  <button class="cmd-run-ref" onclick="sendToTerminal(this)">▶ Run</button>
+                  <button class="cmd-copy-ref" onclick="copyCmdRef(this)">⧉</button>
+                </div>
+              </div>
+              <div class="cmd-block">
+                <div class="cmd-line-ref">
+                  <span class="cmd-prompt-ref">$</span>
+                  <span class="cmd-text-ref"><span class="cmd-kw">git</span> branch <span class="cmd-fl">-M</span> <span class="cmd-pa" id="r-branch1">main</span></span>
+                  <button class="cmd-run-ref" onclick="sendToTerminal(this)">▶ Run</button>
+                  <button class="cmd-copy-ref" onclick="copyCmdRef(this)">⧉</button>
+                </div>
+              </div>
+              <div class="cmd-block">
+                <div class="cmd-line-ref" style="border-color:rgba(61,214,140,0.3)">
+                  <span class="cmd-prompt-ref">$</span>
+                  <span class="cmd-text-ref"><span class="cmd-kw">git</span> push <span class="cmd-fl">-u</span> origin <span class="cmd-pa" id="r-branch2">main</span></span>
+                  <button class="cmd-run-ref" onclick="sendToTerminal(this)">▶ Run</button>
+                  <button class="cmd-copy-ref" onclick="copyCmdRef(this)">⧉</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Update -->
+            <div class="cmd-ref-content" id="ref-update">
+              <div class="cmd-section-label">Update existing repo</div>
+              <div class="cmd-block">
+                <div class="cmd-line-ref">
+                  <span class="cmd-prompt-ref">$</span>
+                  <span class="cmd-text-ref"><span class="cmd-kw">git</span> add <span class="cmd-fl">.</span></span>
+                  <button class="cmd-run-ref" onclick="sendToTerminal(this)">▶ Run</button>
+                  <button class="cmd-copy-ref" onclick="copyCmdRef(this)">⧉</button>
+                </div>
+              </div>
+              <div class="cmd-block">
+                <span class="cmd-comment"># Check staged files</span>
+                <div class="cmd-line-ref">
+                  <span class="cmd-prompt-ref">$</span>
+                  <span class="cmd-text-ref"><span class="cmd-kw">git</span> status</span>
+                  <button class="cmd-run-ref" onclick="sendToTerminal(this)">▶ Run</button>
+                  <button class="cmd-copy-ref" onclick="copyCmdRef(this)">⧉</button>
+                </div>
+              </div>
+              <div class="cmd-block">
+                <div class="cmd-line-ref">
+                  <span class="cmd-prompt-ref">$</span>
+                  <span class="cmd-text-ref"><span class="cmd-kw">git</span> commit <span class="cmd-fl">-m</span> <span class="cmd-str" id="r-msg2">"second commit"</span></span>
+                  <button class="cmd-run-ref" onclick="sendToTerminal(this)">▶ Run</button>
+                  <button class="cmd-copy-ref" onclick="copyCmdRef(this)">⧉</button>
+                </div>
+              </div>
+              <div class="cmd-block">
+                <div class="cmd-line-ref" style="border-color:rgba(61,214,140,0.3)">
+                  <span class="cmd-prompt-ref">$</span>
+                  <span class="cmd-text-ref"><span class="cmd-kw">git</span> push origin <span class="cmd-pa" id="r-branch3">main</span></span>
+                  <button class="cmd-run-ref" onclick="sendToTerminal(this)">▶ Run</button>
+                  <button class="cmd-copy-ref" onclick="copyCmdRef(this)">⧉</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Branch -->
+            <div class="cmd-ref-content" id="ref-branch">
+              <div class="cmd-section-label">New branch</div>
+              <div class="cmd-block">
+                <div class="cmd-line-ref">
+                  <span class="cmd-prompt-ref">$</span>
+                  <span class="cmd-text-ref"><span class="cmd-kw">git</span> checkout <span class="cmd-fl">-b</span> <span class="cmd-ph">feature-name</span></span>
+                  <button class="cmd-run-ref" onclick="sendToTerminal(this)">▶ Run</button>
+                  <button class="cmd-copy-ref" onclick="copyCmdRef(this)">⧉</button>
+                </div>
+              </div>
+              <div class="cmd-block">
+                <div class="cmd-line-ref">
+                  <span class="cmd-prompt-ref">$</span>
+                  <span class="cmd-text-ref"><span class="cmd-kw">git</span> add <span class="cmd-fl">.</span> <span style="color:#3a4a62">&amp;&amp;</span> <span class="cmd-kw">git</span> commit <span class="cmd-fl">-m</span> <span class="cmd-str" id="r-msg3">"feat: changes"</span></span>
+                  <button class="cmd-run-ref" onclick="sendToTerminal(this)">▶ Run</button>
+                  <button class="cmd-copy-ref" onclick="copyCmdRef(this)">⧉</button>
+                </div>
+              </div>
+              <div class="cmd-block">
+                <div class="cmd-line-ref" style="border-color:rgba(61,214,140,0.3)">
+                  <span class="cmd-prompt-ref">$</span>
+                  <span class="cmd-text-ref"><span class="cmd-kw">git</span> push <span class="cmd-fl">-u</span> origin <span class="cmd-ph">feature-name</span></span>
+                  <button class="cmd-run-ref" onclick="sendToTerminal(this)">▶ Run</button>
+                  <button class="cmd-copy-ref" onclick="copyCmdRef(this)">⧉</button>
+                </div>
+              </div>
+              <div class="cmd-block">
+                <span class="cmd-comment"># List all branches</span>
+                <div class="cmd-line-ref">
+                  <span class="cmd-prompt-ref">$</span>
+                  <span class="cmd-text-ref"><span class="cmd-kw">git</span> branch <span class="cmd-fl">-a</span></span>
+                  <button class="cmd-run-ref" onclick="sendToTerminal(this)">▶ Run</button>
+                  <button class="cmd-copy-ref" onclick="copyCmdRef(this)">⧉</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="cmd-note">
+              💡 Remote URL: <span id="r-note-url" style="color:var(--accent2)">connect GitHub to see your URL</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- CONFIG MODAL -->
+<div class="modal-overlay" id="config-modal">
+  <div class="modal">
+    <div class="modal-title">🔗 Connect GitHub</div>
+    <div class="modal-sub">Enter your GitHub credentials to push files directly to your repository.</div>
+    <div class="modal-field">
+      <label>Personal Access Token (PAT)</label>
+      <input type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+    </div>
+    <div class="modal-field">
+      <label>Repository Owner</label>
+      <input type="text" id="gh-owner" placeholder="your-username">
+    </div>
+    <div class="modal-field">
+      <label>Repository Name</label>
+      <input type="text" id="gh-repo" placeholder="my-repository">
+    </div>
+    <div style="background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:4px">
+      <div style="font-size:11px; color:var(--text3); line-height:1.8">
+        💡 Create a PAT at <strong style="color:var(--accent2)">github.com → Settings → Developer settings → Personal access tokens → Tokens (classic)</strong><br>
+        ⚠️ Must check <code style="background:var(--surface3); padding:1px 5px; border-radius:3px; color:var(--green)">✅ repo</code> scope (Full control of private repositories) — this is the most common cause of push failures.
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeConfigModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveGitHubConfig()">Save & Connect</button>
+    </div>
+  </div>
+</div>
+
+<!-- FILE PREVIEW MODAL -->
+<div class="modal-overlay" id="preview-modal">
+  <div class="preview-modal">
+    <div class="preview-header">
+      <span class="preview-title" id="preview-title">preview</span>
+      <span class="preview-badge status-new" id="preview-badge">NEW</span>
+      <div style="display:flex;gap:8px;margin-left:auto">
+        <button class="btn btn-ghost btn-sm" id="preview-open-btn" onclick="openInNewTab()" style="display:none">↗ Open</button>
+        <button class="btn btn-ghost btn-sm" onclick="closePreview()">✕ Close</button>
+      </div>
+    </div>
+    <div class="preview-body" id="preview-body"></div>
+  </div>
+</div>
+
+<!-- TOAST CONTAINER -->
+<div class="toast-container" id="toast-container"></div>
+
+<input type="file" id="file-input" multiple onchange="handleFileSelect(this.files)">
+<input type="file" id="folder-input" webkitdirectory multiple onchange="handleFileSelect(this.files)">
+
+<script>
+// ─── STATE ───
+let files = {};
+let ghConfig = { token: '', owner: '', repo: '' };
+let connected = false;
+let terminalOpen = false;
+let activeTermTab = 'interactive';
+let currentPreviewName = null;
+let termHistory = [];
+let termHistIdx = -1;
+
+// ─── INIT ───
+loadConfig();
+setupDragDrop();
+initTerminal();
+
+function loadConfig() {
+  const saved = localStorage.getItem('filehub_config');
+  if (saved) {
+    try {
+      ghConfig = JSON.parse(saved);
+      if (ghConfig.token && ghConfig.owner && ghConfig.repo) {
+        connected = true;
+        updateGHStatus();
+      }
+    } catch(e) {}
+  }
+}
+
+function updateGHStatus() {
+  const btn = document.getElementById('gh-status-btn');
+  const txt = document.getElementById('gh-status-text');
+  const branch = document.getElementById('push-branch')?.value || 'main';
+
+  if (connected) {
+    btn.className = 'github-status connected';
+    txt.textContent = ghConfig.owner + '/' + ghConfig.repo;
+    document.getElementById('repo-breadcrumb').textContent = ghConfig.repo;
+    document.getElementById('repo-display').textContent = ghConfig.owner + '/' + ghConfig.repo;
+    document.getElementById('branch-display').textContent = branch;
+    document.getElementById('push-branch').value = document.getElementById('push-branch').value || 'main';
+  } else {
+    btn.className = 'github-status';
+    txt.textContent = 'Connect GitHub';
+    document.getElementById('repo-breadcrumb').textContent = '—';
+    document.getElementById('repo-display').textContent = 'not connected';
+    document.getElementById('branch-display').textContent = '—';
+  }
+  updateRefCommands();
+}
+
+// ─── MODAL ───
+function openConfigModal() {
+  document.getElementById('gh-token').value = ghConfig.token || '';
+  document.getElementById('gh-owner').value = ghConfig.owner || '';
+  document.getElementById('gh-repo').value = ghConfig.repo || '';
+  document.getElementById('config-modal').classList.add('open');
+}
+function closeConfigModal() { document.getElementById('config-modal').classList.remove('open'); }
+
+async function saveGitHubConfig() {
+  const token = document.getElementById('gh-token').value.trim();
+  const owner = document.getElementById('gh-owner').value.trim();
+  const repo = document.getElementById('gh-repo').value.trim();
+  if (!token || !owner || !repo) { toast('Please fill in all fields', 'error'); return; }
+  toast('Verifying credentials…', 'info');
+  try {
+    // Step 1: Check token validity and scopes
+    const tokenRes = await fetch(`https://api.github.com/user`, {
+      headers: { Authorization: 'token ' + token, Accept: 'application/vnd.github.v3+json' }
+    });
+    if (tokenRes.status === 401) {
+      toast('❌ Invalid token — regenerate your PAT at github.com/settings/tokens', 'error');
+      termPrint('err', 'Token rejected (401). Go to github.com/settings/tokens and create a new one with "repo" scope.');
+      return;
+    }
+    // Check scopes from response headers
+    const scopes = tokenRes.headers.get('x-oauth-scopes') || '';
+    const hasRepoScope = scopes.split(',').map(s => s.trim()).some(s => s === 'repo' || s === 'public_repo');
+    if (!hasRepoScope) {
+      toast('❌ Token missing "repo" scope — please regenerate with repo access', 'error');
+      termPrint('err', `Token scopes: "${scopes || 'none'}". Need "repo" scope. Go to github.com/settings/tokens → Generate new token (classic) → check ✅ repo`);
+      return;
+    }
+    // Step 2: Check repo access
+    const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
+      headers: { Authorization: 'token ' + token, Accept: 'application/vnd.github.v3+json' }
+    });
+    if (res.status === 200) {
+      const data = await res.json();
+      // Check if we have push access
+      if (!data.permissions || !data.permissions.push) {
+        toast('❌ Token has no push access to this repo', 'error');
+        termPrint('err', `You don't have write permission to ${owner}/${repo}. Make sure you're the owner or a collaborator.`);
+        return;
+      }
+      ghConfig = { token, owner, repo };
+      localStorage.setItem('filehub_config', JSON.stringify(ghConfig));
+      connected = true;
+      updateGHStatus();
+      closeConfigModal();
+      toast('✅ Connected to ' + owner + '/' + repo, 'success');
+      document.getElementById('push-branch').value = data.default_branch || 'main';
+      updateGHStatus();
+      termPrint('system', `Connected to ${owner}/${repo} (${data.default_branch || 'main'}) — token scopes: ${scopes}`);
+    } else if (res.status === 401) {
+      toast('❌ Invalid token — check your PAT', 'error');
+      termPrint('err', 'Token rejected. Regenerate at github.com/settings/tokens with "repo" scope.');
+    } else if (res.status === 404) {
+      toast('❌ Repo not found — check owner/repo name or make token has repo scope', 'error');
+      termPrint('err', `Repo "${owner}/${repo}" not found. Check spelling, or if it's private ensure your token has "repo" scope (not just "public_repo").`);
+    } else if (res.status === 403) {
+      toast('❌ Access forbidden — token missing "repo" scope', 'error');
+      termPrint('err', 'Got 403 Forbidden. Your token needs "repo" scope. Go to github.com/settings/tokens and regenerate it.');
+    } else {
+      toast('Connection failed: ' + res.status, 'error');
+    }
+  } catch (e) {
+    toast('Network error: ' + e.message, 'error');
+  }
+}
+
+// ─── FILE HANDLING ───
+function setupDragDrop() {
+  const zone = document.getElementById('file-area');
+  zone.addEventListener('dragenter', e => { e.preventDefault(); document.getElementById('drop-overlay').classList.add('active'); });
+  zone.addEventListener('dragover', e => { e.preventDefault(); });
+  zone.addEventListener('dragleave', e => { if (!zone.contains(e.relatedTarget)) document.getElementById('drop-overlay').classList.remove('active'); });
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    document.getElementById('drop-overlay').classList.remove('active');
+    const items = e.dataTransfer.items;
+    if (items) {
+      // Support folder drop via DataTransferItemList
+      const entries = [];
+      for (let i = 0; i < items.length; i++) {
+        const entry = items[i].webkitGetAsEntry ? items[i].webkitGetAsEntry() : null;
+        if (entry) entries.push(entry);
+      }
+      if (entries.length) {
+        readEntries(entries);
+        return;
+      }
+    }
+    handleFileSelect(e.dataTransfer.files);
+  });
+}
+
+function readEntries(entries, basePath = '') {
+  const promises = entries.map(entry => readEntry(entry, basePath));
+  Promise.all(promises);
+}
+
+function readEntry(entry, basePath) {
+  return new Promise(resolve => {
+    if (entry.isFile) {
+      entry.file(file => {
+        const path = basePath ? `${basePath}/${file.name}` : file.name;
+        addFile(file, path);
+        resolve();
+      });
+    } else if (entry.isDirectory) {
+      const reader = entry.createReader();
+      const readAll = () => {
+        reader.readEntries(entries => {
+          if (!entries.length) { resolve(); return; }
+          const subPath = basePath ? `${basePath}/${entry.name}` : entry.name;
+          Promise.all(entries.map(e => readEntry(e, subPath))).then(() => readAll());
+        });
+      };
+      readAll();
+    }
+  });
+}
+
+function handleFileSelect(fileList) {
+  if (!fileList || !fileList.length) return;
+  Array.from(fileList).forEach(file => {
+    const path = file.webkitRelativePath || file.name;
+    addFile(file, path);
+  });
+}
+
+function addFile(file, path) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const existing = files[path];
+    files[path] = {
+      file, path,
+      name: file.name,
+      status: existing ? 'modified' : 'new',
+      content: e.target.result,
+      size: file.size,
+      type: file.type || 'application/octet-stream'
+    };
+    renderAll();
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeFile(path) { delete files[path]; renderAll(); }
+function clearAll() { files = {}; renderAll(); }
+
+// ─── RENDER ───
+function renderAll() { renderGrid(); renderTree(); updateStats(); }
+
+function getFileEmoji(name) {
+  const ext = name.split('.').pop().toLowerCase();
+  const map = { js:'🟨',ts:'🔷',jsx:'⚛️',tsx:'⚛️',html:'🌐',css:'🎨',scss:'💅',json:'📋',md:'📝',txt:'📄',py:'🐍',java:'☕',php:'🐘',go:'🐹',rs:'🦀',cpp:'⚙️',c:'⚙️',sh:'⚡',svg:'🖼️',png:'🖼️',jpg:'🖼️',jpeg:'🖼️',gif:'🖼️',webp:'🖼️',pdf:'📕',zip:'📦',tar:'📦',gz:'📦',mp4:'🎬',mp3:'🎵',csv:'📊',xml:'📋',yaml:'⚙️',yml:'⚙️',env:'🔒',gitignore:'🚫' };
+  return map[ext] || '📄';
+}
+
+function isPreviewable(name) {
+  const ext = name.split('.').pop().toLowerCase();
+  return ['html','htm','png','jpg','jpeg','gif','webp','svg','txt','md','js','css','json','py','ts'].includes(ext);
+}
+
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+  return (bytes/(1024*1024)).toFixed(1) + ' MB';
+}
+
+function renderGrid() {
+  const grid = document.getElementById('file-grid');
+  const empty = document.getElementById('empty-state');
+  const keys = Object.keys(files);
+  if (!keys.length) {
+    grid.style.display = 'none'; empty.style.display = 'flex';
+    document.getElementById('clear-btn').style.display = 'none';
+    document.getElementById('push-toggle-btn').style.display = 'none';
+    return;
+  }
+  grid.style.display = 'grid'; empty.style.display = 'none';
+  document.getElementById('clear-btn').style.display = 'block';
+  document.getElementById('push-toggle-btn').style.display = connected ? 'flex' : 'none';
+
+  grid.innerHTML = keys.map(path => {
+    const f = files[path];
+    const emoji = getFileEmoji(f.name);
+    const canPreview = isPreviewable(f.name);
+    const statusLabel = f.status === 'new' ? '<span class="file-card-status status-new">NEW</span>' :
+                        f.status === 'modified' ? '<span class="file-card-status status-mod">MOD</span>' :
+                        '<span class="file-card-status status-pushed">PUSHED</span>';
+    const folder = path.includes('/') ? path.split('/').slice(0,-1).join('/') : '';
+    const safeP = path.replace(/'/g, "\\'");
+    return `
+      <div class="file-card ${canPreview ? 'has-preview' : ''}" onclick="previewFile('${safeP}')" title="${path}">
+        ${statusLabel}
+        <div class="file-card-actions">
+          ${canPreview ? `<button class="fc-btn fc-btn-preview" onclick="event.stopPropagation();previewFile('${safeP}')" title="Preview">👁</button>` : ''}
+          <button class="fc-btn fc-btn-remove" onclick="event.stopPropagation();removeFile('${safeP}')" title="Remove">✕</button>
+        </div>
+        <span class="file-card-icon">${emoji}</span>
+        <div class="file-card-name">${f.name}</div>
+        ${folder ? `<div class="file-card-path">📁 ${folder}</div>` : ''}
+        <div class="file-card-meta">${formatSize(f.size)}</div>
+      </div>`;
+  }).join('');
+}
+
+function renderTree() {
+  const tree = document.getElementById('file-tree');
+  const keys = Object.keys(files);
+  if (!keys.length) {
+    tree.innerHTML = '<div style="padding: 20px 16px; color: var(--text3); font-size: 12px; font-family: var(--mono);">No files uploaded yet</div>';
+    return;
+  }
+  // Group by folder
+  const folders = {};
+  const rootFiles = [];
+  keys.forEach(path => {
+    const parts = path.split('/');
+    if (parts.length > 1) {
+      const folder = parts.slice(0, -1).join('/');
+      if (!folders[folder]) folders[folder] = [];
+      folders[folder].push(path);
+    } else {
+      rootFiles.push(path);
+    }
+  });
+
+  let html = '';
+  rootFiles.forEach(path => {
+    const f = files[path];
+    const badge = f.status === 'new' ? '<span class="tree-badge new">N</span>' : f.status === 'modified' ? '<span class="tree-badge mod">M</span>' : '';
+    const safeP = path.replace(/'/g, "\\'");
+    html += `<div class="tree-item"><span class="tree-icon">${getFileEmoji(f.name)}</span><span class="tree-name">${f.name}</span>${badge}<button class="del-btn" onclick="removeFile('${safeP}')">✕</button></div>`;
+  });
+  Object.keys(folders).forEach(folder => {
+    html += `<div class="tree-folder">📁 ${folder}</div>`;
+    folders[folder].forEach(path => {
+      const f = files[path];
+      const badge = f.status === 'new' ? '<span class="tree-badge new">N</span>' : f.status === 'modified' ? '<span class="tree-badge mod">M</span>' : '';
+      const safeP = path.replace(/'/g, "\\'");
+      html += `<div class="tree-item indented"><span class="tree-icon">${getFileEmoji(f.name)}</span><span class="tree-name">${f.name}</span>${badge}<button class="del-btn" onclick="removeFile('${safeP}')">✕</button></div>`;
+    });
+  });
+  tree.innerHTML = html;
+}
+
+function updateStats() {
+  const keys = Object.keys(files);
+  const stats = document.getElementById('stats-bar');
+  if (!keys.length) { stats.style.display = 'none'; return; }
+  stats.style.display = 'flex';
+  document.getElementById('stat-new').textContent = keys.filter(k => files[k].status === 'new').length;
+  document.getElementById('stat-mod').textContent = keys.filter(k => files[k].status === 'modified').length;
+  document.getElementById('stat-total').textContent = keys.length;
+}
+
+// ─── FILE PREVIEW ───
+function previewFile(path) {
+  const f = files[path];
+  if (!f) return;
+  currentPreviewName = path;
+  const ext = f.name.split('.').pop().toLowerCase();
+  const modal = document.getElementById('preview-modal');
+  const body = document.getElementById('preview-body');
+  const title = document.getElementById('preview-title');
+  const badge = document.getElementById('preview-badge');
+  const openBtn = document.getElementById('preview-open-btn');
+
+  title.textContent = path;
+  badge.textContent = f.status.toUpperCase();
+  badge.className = 'preview-badge status-' + (f.status === 'new' ? 'new' : f.status === 'modified' ? 'mod' : 'pushed');
+  body.innerHTML = '';
+  openBtn.style.display = 'none';
+
+  if (['html', 'htm'].includes(ext)) {
+    const iframe = document.createElement('iframe');
+    iframe.className = 'preview-iframe';
+    iframe.sandbox = 'allow-scripts allow-same-origin allow-forms';
+    body.appendChild(iframe);
+    const doc = iframe.contentDocument || iframe.contentWindow.document;
+    doc.open();
+    // Decode base64 content
+    const b64 = f.content.split(',')[1];
+    const decoded = b64 ? atob(b64) : f.content;
+    doc.write(decoded);
+    doc.close();
+    openBtn.style.display = 'flex';
+    openBtn._content = decoded;
+  } else if (['png','jpg','jpeg','gif','webp','svg'].includes(ext)) {
+    const img = document.createElement('img');
+    img.src = f.content;
+    img.className = 'preview-image';
+    body.appendChild(img);
+  } else if (['txt','md','js','ts','css','json','py','jsx','tsx','sh','yaml','yml'].includes(ext)) {
+    const pre = document.createElement('div');
+    pre.className = 'preview-code';
+    const b64 = f.content.split(',')[1];
+    try { pre.textContent = b64 ? atob(b64) : f.content; } catch(e) { pre.textContent = f.content; }
+    body.appendChild(pre);
+  } else {
+    body.innerHTML = `<div class="preview-unsupported"><span style="font-size:48px">${getFileEmoji(f.name)}</span><div style="font-size:14px;color:var(--text2)">${f.name}</div><div style="font-size:12px">Preview not available for this file type</div><div style="font-size:11px; color:var(--text3); font-family:var(--mono)">${formatSize(f.size)}</div></div>`;
+  }
+
+  modal.classList.add('open');
+}
+
+function openInNewTab() {
+  const btn = document.getElementById('preview-open-btn');
+  if (btn._content) {
+    const blob = new Blob([btn._content], { type: 'text/html' });
+    window.open(URL.createObjectURL(blob), '_blank');
+  }
+}
+function closePreview() { document.getElementById('preview-modal').classList.remove('open'); }
+
+// ─── PUSH PANEL ───
+function togglePushPanel() {
+  if (!connected) { toast('Connect GitHub first!', 'error'); openConfigModal(); return; }
+  const panel = document.getElementById('push-panel');
+  const isVisible = panel.classList.contains('visible');
+  panel.classList.toggle('visible', !isVisible);
+  if (!isVisible && !document.getElementById('commit-msg').value) {
+    const count = Object.keys(files).length;
+    document.getElementById('commit-msg').value = `feat: add ${count} file${count!==1?'s':''} via FileHub`;
+    updateRefCommands();
+  }
+}
+
+// ─── PUSH TO GITHUB ───
+async function pushToGitHub() {
+  const keys = Object.keys(files).filter(k => files[k].status !== 'pushed');
+  if (!keys.length) { toast('No new files to push!', 'error'); return; }
+  if (!connected) { toast('Connect GitHub first!', 'error'); return; }
+
+  const commitMsg = document.getElementById('commit-msg').value.trim() || 'Update files via FileHub';
+  const branch = document.getElementById('push-branch').value.trim() || 'main';
+  let pathPrefix = document.getElementById('push-path').value.trim();
+  if (pathPrefix && !pathPrefix.endsWith('/')) pathPrefix += '/';
+
+  const progressDiv = document.getElementById('push-progress');
+  const actionsDiv = document.getElementById('push-actions');
+  const progressFill = document.getElementById('progress-fill');
+  const statusText = document.getElementById('push-status-text');
+  const pushBtn = document.getElementById('do-push-btn');
+
+  progressDiv.style.display = 'block'; actionsDiv.style.display = 'none'; pushBtn.disabled = true;
+  termPrint('cmd', `git push -u origin ${branch} (${keys.length} file${keys.length!==1?'s':''})`);
+
+  let pushed = 0, errors = 0;
+  for (let i = 0; i < keys.length; i++) {
+    const filePath = keys[i];
+    const f = files[filePath];
+    const repoPath = pathPrefix + filePath;
+    statusText.textContent = `Pushing ${f.name}… (${i+1}/${keys.length})`;
+    progressFill.style.width = ((i/keys.length)*100) + '%';
+    try {
+      let sha = null;
+      try {
+        const chk = await fetch(`https://api.github.com/repos/${ghConfig.owner}/${ghConfig.repo}/contents/${repoPath}?ref=${branch}`, { headers: { Authorization: 'token '+ghConfig.token } });
+        if (chk.ok) sha = (await chk.json()).sha;
+      } catch(_){}
+      const base64 = f.content.split(',')[1] || btoa(f.content);
+      const body = { message: commitMsg, content: base64, branch };
+      if (sha) body.sha = sha;
+      const res = await fetch(`https://api.github.com/repos/${ghConfig.owner}/${ghConfig.repo}/contents/${repoPath}`, {
+        method: 'PUT',
+        headers: { Authorization: 'token '+ghConfig.token, Accept: 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      if (res.ok) { files[filePath].status = 'pushed'; pushed++; }
+      else {
+        const err = await res.json();
+        errors++;
+        let hint = err.message || 'Unknown error';
+        if (res.status === 403 || hint.includes('Resource not accessible')) {
+          hint = 'Token missing "repo" scope. Go to github.com/settings/tokens → regenerate with ✅ repo checked.';
+          // Show this detailed error only once
+          if (errors === 1) termPrint('err', `PUSH FAILED: ${hint}`);
+        } else if (res.status === 401) {
+          hint = 'Token invalid or expired. Regenerate at github.com/settings/tokens.';
+        } else if (res.status === 422) {
+          hint = hint + ' (file may be too large or path invalid)';
+        }
+        toast(`Failed: ${f.name} — ${hint}`, 'error');
+      }
+    } catch(e) { errors++; toast(`Error: ${f.name} — ${e.message}`, 'error'); }
+  }
+  progressFill.style.width = '100%';
+  progressDiv.style.display = 'none'; actionsDiv.style.display = 'flex'; pushBtn.disabled = false;
+  if (pushed > 0) {
+    toast(`✅ Pushed ${pushed} file${pushed!==1?'s':''} to ${ghConfig.owner}/${ghConfig.repo}:${branch}`, 'success');
+    termPrint('ok', `Pushed ${pushed} file${pushed!==1?'s':''} → ${ghConfig.owner}/${ghConfig.repo}:${branch}`);
+    renderAll();
+    document.getElementById('push-panel').classList.remove('visible');
+  }
+  if (errors > 0) { termPrint('err', `${errors} file${errors!==1?'s':''} failed`); }
+}
+
+// ─── TERMINAL ───
+function toggleTerminal() {
+  terminalOpen = !terminalOpen;
+  document.getElementById('terminal-body').classList.toggle('open', terminalOpen);
+  document.getElementById('term-chevron').classList.toggle('open', terminalOpen);
+  if (terminalOpen) {
+    document.getElementById('iterm-input').focus();
+    scrollTermOutput();
+  }
+}
+
+function switchTermTab(tab) {
+  activeTermTab = tab;
+  document.getElementById('ttab-interactive').classList.toggle('active', tab === 'interactive');
+  document.getElementById('ttab-reference').classList.toggle('active', tab === 'reference');
+  document.getElementById('term-interactive').style.display = tab === 'interactive' ? 'flex' : 'none';
+  document.getElementById('term-reference').style.display = tab === 'reference' ? 'block' : 'none';
+}
+
+function initTerminal() {
+  termPrint('welcome', 'FileHub Terminal — type git commands or use the Commands tab');
+  termPrint('info', 'Supported: git add, git commit, git push, git status, git init, git log, clear, help');
+
+  const input = document.getElementById('iterm-input');
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); runTermCmd(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); histNav(-1); }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); histNav(1); }
+  });
+  updateRefCommands();
+}
+
+function histNav(dir) {
+  const input = document.getElementById('iterm-input');
+  if (!termHistory.length) return;
+  termHistIdx = Math.max(-1, Math.min(termHistory.length - 1, termHistIdx + dir));
+  input.value = termHistIdx >= 0 ? termHistory[termHistory.length - 1 - termHistIdx] : '';
+}
+
+function scrollTermOutput() {
+  const out = document.getElementById('iterm-output');
+  out.scrollTop = out.scrollHeight;
+}
+
+function termPrint(type, text) {
+  const out = document.getElementById('iterm-output');
+  const div = document.createElement('div');
+  if (type === 'cmd') {
+    div.className = 'iterm-line';
+    const owner = ghConfig.owner || 'user';
+    const repo = ghConfig.repo || 'repo';
+    const branch = document.getElementById('push-branch')?.value || 'main';
+    div.innerHTML = `<span class="iterm-user">${owner}</span><span class="iterm-at">@FileHub</span> <span class="iterm-path">~/${repo}</span> <span class="iterm-branch">(${branch})</span> <span style="color:#c8d8f8">$</span> <span class="iterm-cmd">${escHtml(text)}</span>`;
+  } else if (type === 'ok') {
+    div.className = 'iterm-out ok';
+    div.textContent = text;
+  } else if (type === 'err') {
+    div.className = 'iterm-out err';
+    div.textContent = '✗ ' + text;
+  } else if (type === 'welcome') {
+    div.style.cssText = 'color:#6fa3ff; font-family:var(--mono); font-size:12px; padding:2px 0;';
+    div.textContent = '// ' + text;
+  } else if (type === 'system') {
+    div.style.cssText = 'color:#3dd68c; font-family:var(--mono); font-size:11px; padding:2px 0;';
+    div.textContent = '● ' + text;
+  } else {
+    div.className = 'iterm-out';
+    div.textContent = text;
+  }
+  out.appendChild(div);
+  scrollTermOutput();
+}
+
+function escHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function runTermCmd() {
+  const input = document.getElementById('iterm-input');
+  const raw = input.value.trim();
+  if (!raw) return;
+  termHistory.push(raw);
+  termHistIdx = -1;
+  input.value = '';
+  termPrint('cmd', raw);
+  processTermCmd(raw);
+}
+
+function sendToTerminal(btn) {
+  const line = btn.closest('.cmd-line-ref');
+  const textEl = line.querySelector('.cmd-text-ref');
+  const cmd = textEl.innerText.trim();
+  // Switch to interactive tab and pre-fill
+  switchTermTab('interactive');
+  if (!terminalOpen) toggleTerminal();
+  document.getElementById('iterm-input').value = cmd;
+  document.getElementById('iterm-input').focus();
+  termPrint('info', `↑ Loaded: ${cmd}`);
+}
+
+async function processTermCmd(raw) {
+  const parts = raw.trim().split(/\s+/);
+  const cmd = parts[0];
+  const sub = parts[1];
+
+  if (raw === 'clear' || raw === 'cls') { document.getElementById('iterm-output').innerHTML = ''; return; }
+  if (raw === 'help') { printHelp(); return; }
+  if (raw === 'ls' || raw === 'dir') {
+    const keys = Object.keys(files);
+    if (!keys.length) { termPrint('info', 'No files loaded'); return; }
+    keys.forEach(p => termPrint('info', p + '  (' + formatSize(files[p].size) + ')'));
+    return;
+  }
+
+  if (cmd !== 'git') { termPrint('err', `Unknown command: ${cmd}. Try: git, ls, clear, help`); return; }
+
+  const branch = document.getElementById('push-branch')?.value || 'main';
+
+  if (sub === 'init') {
+    termPrint('info', 'Initialized empty Git repository in .git/');
+    termPrint('ok', 'hint: Use "git add ." then "git commit -m \'message\'"');
+    return;
+  }
+  if (sub === 'status') {
+    const keys = Object.keys(files);
+    if (!keys.length) { termPrint('info', 'nothing to commit, working tree clean'); return; }
+    const newF = keys.filter(k => files[k].status === 'new');
+    const modF = keys.filter(k => files[k].status === 'modified');
+    const pushed = keys.filter(k => files[k].status === 'pushed');
+    termPrint('info', `On branch ${branch}`);
+    if (newF.length) { termPrint('ok', 'New files:'); newF.forEach(k => termPrint('ok', '  + ' + k)); }
+    if (modF.length) { termPrint('ok', 'Modified:'); modF.forEach(k => termPrint('ok', '  M ' + k)); }
+    if (pushed.length) { termPrint('info', `Pushed: ${pushed.length} file(s)`); }
+    return;
+  }
+  if (sub === 'add') {
+    const keys = Object.keys(files);
+    if (!keys.length) { termPrint('info', 'No files to stage'); return; }
+    termPrint('ok', `Staged ${keys.length} file(s)`);
+    return;
+  }
+  if (sub === 'commit') {
+    const mIdx = parts.indexOf('-m');
+    if (mIdx < 0) { termPrint('err', 'Usage: git commit -m "message"'); return; }
+    const msg = parts.slice(mIdx+1).join(' ').replace(/^["']|["']$/g, '');
+    document.getElementById('commit-msg').value = msg;
+    updateRefCommands();
+    const keys = Object.keys(files).filter(k => files[k].status !== 'pushed');
+    if (!keys.length) { termPrint('info', 'nothing to commit'); return; }
+    const fakeHash = Math.random().toString(16).slice(2,9);
+    termPrint('ok', `[${branch} ${fakeHash}] ${msg}`);
+    termPrint('info', ` ${keys.length} file(s) changed`);
+    return;
+  }
+  if (sub === 'push') {
+    if (!connected) { termPrint('err', 'Not connected to GitHub. Click "Connect GitHub" first.'); return; }
+    const keys = Object.keys(files).filter(k => files[k].status !== 'pushed');
+    if (!keys.length) { termPrint('info', 'Everything up-to-date'); return; }
+    termPrint('info', `Pushing ${keys.length} file(s) to ${ghConfig.owner}/${ghConfig.repo}:${branch}…`);
+    // Trigger actual push
+    const panel = document.getElementById('push-panel');
+    if (!panel.classList.contains('visible')) togglePushPanel();
+    setTimeout(() => pushToGitHub(), 300);
+    return;
+  }
+  if (sub === 'remote') {
+    if (parts[2] === 'add' && parts[3] === 'origin' && parts[4]) {
+      termPrint('ok', `Remote origin set to ${parts[4]}`);
+      return;
+    }
+    if (parts[2] === '-v') {
+      const url = connected ? `https://github.com/${ghConfig.owner}/${ghConfig.repo}.git` : '(not connected)';
+      termPrint('info', `origin  ${url} (fetch)`);
+      termPrint('info', `origin  ${url} (push)`);
+      return;
+    }
+  }
+  if (sub === 'branch') {
+    if (parts[2] === '-M' && parts[3]) {
+      document.getElementById('push-branch').value = parts[3];
+      updateGHStatus();
+      termPrint('ok', `Branch renamed to '${parts[3]}'`);
+      return;
+    }
+    if (parts[2] === '-a' || !parts[2]) {
+      termPrint('ok', `* ${branch}`);
+      return;
+    }
+  }
+  if (sub === 'checkout' && parts[2] === '-b' && parts[3]) {
+    document.getElementById('push-branch').value = parts[3];
+    updateGHStatus();
+    termPrint('ok', `Switched to new branch '${parts[3]}'`);
+    return;
+  }
+  if (sub === 'log') {
+    const keys = Object.keys(files).filter(k => files[k].status === 'pushed');
+    if (!keys.length) { termPrint('info', 'No commits yet'); return; }
+    const fakeHash = Math.random().toString(16).slice(2,16);
+    termPrint('ok', `commit ${fakeHash}`);
+    termPrint('info', `Author: ${ghConfig.owner || 'you'}`);
+    termPrint('info', `Date:   ${new Date().toDateString()}`);
+    termPrint('info', `    Pushed ${keys.length} file(s) via FileHub`);
+    return;
+  }
+  termPrint('err', `Unknown git subcommand: ${sub}. Try: init, add, commit, push, status, branch, checkout, log, remote`);
+}
+
+function printHelp() {
+  const cmds = [
+    ['git init', 'Initialize repository'],
+    ['git add .', 'Stage all files'],
+    ['git commit -m "msg"', 'Commit changes'],
+    ['git push', 'Push to GitHub (uses your connected repo)'],
+    ['git status', 'Show file statuses'],
+    ['git branch -M main', 'Rename branch'],
+    ['git checkout -b branch', 'Create new branch'],
+    ['git remote -v', 'Show remote URL'],
+    ['git log', 'Show commit log'],
+    ['ls', 'List loaded files'],
+    ['clear', 'Clear terminal'],
+  ];
+  termPrint('info', '─── Available Commands ───');
+  cmds.forEach(([cmd, desc]) => termPrint('info', `  ${cmd.padEnd(30)} ${desc}`));
+}
+
+// ─── REFERENCE COMMANDS ───
+function updateRefCommands() {
+  const owner = ghConfig.owner || 'username';
+  const repo = ghConfig.repo || 'repo';
+  const branch = document.getElementById('push-branch')?.value || 'main';
+  const msg = document.getElementById('commit-msg')?.value || 'initial commit';
+  const url = `https://github.com/${owner}/${repo}.git`;
+
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  set('r-cd', `~/Desktop/${repo}`);
+  set('r-remote', url);
+  set('r-branch1', branch); set('r-branch2', branch); set('r-branch3', branch);
+  set('r-msg1', `"${msg}"`); set('r-msg2', `"${msg}"`); set('r-msg3', `"${msg}"`);
+  set('r-note-url', url);
+  set('term-hint', connected ? `${owner}/${repo} · branch: ${branch}` : 'connect GitHub to push');
+
+  // PS1
+  set('ps1-user', owner);
+  set('ps1-path', `~/${repo}`);
+  set('ps1-branch', `(${branch})`);
+}
+
+function switchRefTab(tab) {
+  document.querySelectorAll('.cmd-tab2').forEach((t, i) => {
+    t.classList.toggle('active', ['first','update','branch'][i] === tab);
+  });
+  ['first','update','branch'].forEach(t => {
+    const el = document.getElementById('ref-' + t);
+    if (el) el.classList.toggle('active', t === tab);
+  });
+}
+
+function copyCmdRef(btn) {
+  const line = btn.closest('.cmd-line-ref');
+  const text = line.querySelector('.cmd-text-ref').innerText.trim();
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.textContent; btn.textContent = '✓'; btn.style.color = 'var(--green)';
+    setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 1500);
+  });
+}
+
+function copyRefAll() {
+  const active = document.querySelector('.cmd-ref-content.active');
+  const cmds = Array.from(active.querySelectorAll('.cmd-text-ref')).map(el => '$ ' + el.innerText.trim()).join('\n');
+  navigator.clipboard.writeText(cmds).then(() => {
+    toast('Commands copied!', 'success');
+  });
+}
+
+// ─── TOAST ───
+function toast(msg, type = 'info') {
+  const container = document.getElementById('toast-container');
+  const icons = { success: '✅', error: '❌', info: 'ℹ️' };
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span class="toast-icon">${icons[type]||'ℹ️'}</span><span class="toast-msg">${msg}</span>`;
+  container.appendChild(el);
+  setTimeout(() => { el.style.opacity='0'; el.style.transition='opacity 0.3s'; setTimeout(() => el.remove(), 300); }, 4000);
+}
+
+// ─── EVENT LISTENERS ───
+document.getElementById('config-modal').addEventListener('click', function(e) { if (e.target===this) closeConfigModal(); });
+document.getElementById('preview-modal').addEventListener('click', function(e) { if (e.target===this) closePreview(); });
+document.getElementById('commit-msg').addEventListener('input', updateRefCommands);
+document.getElementById('push-branch').addEventListener('input', () => { updateGHStatus(); updateRefCommands(); });
+</script>
+</body>
+</html>
